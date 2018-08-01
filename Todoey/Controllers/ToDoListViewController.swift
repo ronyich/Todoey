@@ -10,15 +10,27 @@ import UIKit
 
 class ToDoListViewController: UITableViewController {
     
-    var itemArray = ["Find Mike","Buy Eggos","Destory Demogorgon"]
+    var itemArray = [Item]()
     //建立一個標準版的UserDefaults，用來永久儲存
     let defaults = UserDefaults.standard
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        let newItem = Item()
+        newItem.title = "Find Mike"
+        itemArray.append(newItem)
+        
+        let newItem2 = Item()
+        newItem2.title = "Buy Eggos"
+        itemArray.append(newItem2)
+        
+        let newItem3 = Item()
+        newItem3.title = "Destory"
+        itemArray.append(newItem3)
+        
         //讓app一開始就先檢索"ToDoListArray"目錄裡的資料，讓以前存過資料顯示出來
-        if let items = defaults.array(forKey: "ToDoListArray") as? [String] {
+        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
             itemArray = items
         }
         
@@ -28,7 +40,21 @@ class ToDoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text = itemArray[indexPath.row]
+        
+        let item = itemArray[indexPath.row]
+        
+        cell.textLabel?.text = item.title
+        
+        //判斷若item.done為true就做checkmark打勾記號，false的話就做空白記號
+        //Ternary operator 三元運算子，同下面五行的結果
+        //Value = condition ? valueIfTrue : valueIfFalse
+        cell.accessoryType = item.done ? .checkmark : .none
+        
+        //if item.done == true {
+        //    cell.accessoryType = .checkmark
+        //}else{
+        //    cell.accessoryType = .none
+        //}
         
         return cell
     }
@@ -39,18 +65,20 @@ class ToDoListViewController: UITableViewController {
     
     //MARK: TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        //print(itemArray[indexPath.row])
         
-        //利用if判斷是否有做checkmark記號，如果有就消除，沒有的話就打勾
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        }else{
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
+        //這一行等同於下面5行判斷式
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        
+        //if itemArray[indexPath.row].done == false {
+        //    itemArray[indexPath.row].done = true
+        //}else{
+        //    itemArray[indexPath.row].done = false
+        //}
         
         //選到該列時會有短暫淡出動畫
         tableView.deselectRow(at: indexPath, animated: true)
         
+        tableView.reloadData()
     }
     
     //MARK: Add New Items
@@ -62,8 +90,12 @@ class ToDoListViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             alert.addTextField { (alertTextField) in
+                
+                let newItem = Item()
+                newItem.title = textField.text!
+                
                 //把輸入的內容存到itemArray
-                self.itemArray.append(textField.text!)
+                self.itemArray.append(newItem)
                 
                 //把資料存到"ToDoListArray"目錄裡，還需在viewDidLoad裡設定檢索(讀取)itemArray
                 self.defaults.setValue(self.itemArray, forKey: "ToDoListArray")
