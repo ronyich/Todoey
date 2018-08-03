@@ -11,28 +11,19 @@ import UIKit
 class ToDoListViewController: UITableViewController {
     
     var itemArray = [Item]()
-    //建立一個標準版的UserDefaults，用來永久儲存
-    let defaults = UserDefaults.standard
+    
+    //建立一個儲存資料的主目錄
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    
+    //建立一個標準版的UserDefaults，用來永久儲存，創建dataPath後
+    //let defaults = UserDefaults.standard
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let newItem = Item()
-        newItem.title = "Find Mike"
-        itemArray.append(newItem)
+        //print(dataFilePath)
         
-        let newItem2 = Item()
-        newItem2.title = "Buy Eggos"
-        itemArray.append(newItem2)
-        
-        let newItem3 = Item()
-        newItem3.title = "Destory"
-        itemArray.append(newItem3)
-        
-        //讓app一開始就先檢索"ToDoListArray"目錄裡的資料，讓以前存過資料顯示出來
-        if let items = defaults.array(forKey: "ToDoListArray") as? [Item] {
-            itemArray = items
-        }
+        loadItems()
         
     }
     
@@ -50,11 +41,11 @@ class ToDoListViewController: UITableViewController {
         //Value = condition ? valueIfTrue : valueIfFalse
         cell.accessoryType = item.done ? .checkmark : .none
         
-        //if item.done == true {
-        //    cell.accessoryType = .checkmark
-        //}else{
-        //    cell.accessoryType = .none
-        //}
+//        if item.done == true {
+//            cell.accessoryType = .checkmark
+//        }else{
+//            cell.accessoryType = .none
+//        }
         
         return cell
     }
@@ -66,19 +57,19 @@ class ToDoListViewController: UITableViewController {
     //MARK: TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        //這一行等同於下面5行判斷式
+        //這一行等同於下面5行判斷式，點下該cell就會反轉done裡的true false結果
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-        //if itemArray[indexPath.row].done == false {
-        //    itemArray[indexPath.row].done = true
-        //}else{
-        //    itemArray[indexPath.row].done = false
-        //}
+        saveItems()
+        
+//        if itemArray[indexPath.row].done == false {
+//            itemArray[indexPath.row].done = true
+//        }else{
+//            itemArray[indexPath.row].done = false
+//        }
         
         //選到該列時會有短暫淡出動畫
         tableView.deselectRow(at: indexPath, animated: true)
-        
-        tableView.reloadData()
     }
     
     //MARK: Add New Items
@@ -89,20 +80,18 @@ class ToDoListViewController: UITableViewController {
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
-            alert.addTextField { (alertTextField) in
                 
                 let newItem = Item()
                 newItem.title = textField.text!
                 
                 //把輸入的內容存到itemArray
                 self.itemArray.append(newItem)
-                
-                //把資料存到"ToDoListArray"目錄裡，還需在viewDidLoad裡設定檢索(讀取)itemArray
-                self.defaults.setValue(self.itemArray, forKey: "ToDoListArray")
+            
+                self.saveItems()
                 
                 //reload之後才會將更新的資料顯示在tableView中
-                self.tableView.reloadData()
-            }
+                //self.tableView.reloadData()
+            
         }
         
         let actionCancel = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
@@ -121,5 +110,30 @@ class ToDoListViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
         
     }
+    
+    func saveItems() {
+        //把資料嘗試寫入dataPath裡面，要將Item class遵從Encodeble協定，才能在新增資料時
+        //自動將itemArray資料編碼，並存到dataFilePath目錄下的Items.plist檔案中。
+        let encoder = PropertyListEncoder()
+        do {
+            let data = try encoder.encode(itemArray)
+            try data.write(to: dataFilePath!)
+        }catch{
+            print("Error encoding item array, \(error)")
+        }
+        tableView.reloadData()
+    }
+    //用Decoder解碼Items.plist檔案
+    func loadItems() {
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do {
+                itemArray = try decoder.decode([Item].self, from: data)
+            }catch{
+                print("Error decoding item array,\(error)")
+            }
+        }
+    }
+    
 }
 
