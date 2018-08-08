@@ -29,7 +29,6 @@ class ToDoListViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-     
     }
     
     @IBAction func refreshDataButton(_ sender: UIBarButtonItem) {
@@ -103,6 +102,7 @@ class ToDoListViewController: UITableViewController {
             newItem.title = textField.text!
             newItem.done = false
             newItem.parentCategory = self.selectedCategory //指定父類別資料來源
+
             
             //把輸入的內容存到itemArray
             self.itemArray.append(newItem)
@@ -161,6 +161,15 @@ class ToDoListViewController: UITableViewController {
             print("Error fetching data from context \(error)")
         }
         tableView.reloadData()
+    }
+    //未完成
+    func deleteNilData() {
+        let newItem = Item(context: self.context)
+        
+        let resultArray = [newItem.parentCategory].filter({ (item) -> Bool in
+            return item == nil
+        })
+        print("@@@\(resultArray.count)")
     }
     
 }
