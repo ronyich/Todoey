@@ -8,8 +8,10 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class CategoryViewController: UITableViewController {
+
+class CategoryViewController: SwipeTableViewController {
     
     let realm = try! Realm()
     
@@ -21,6 +23,7 @@ class CategoryViewController: UITableViewController {
         
         loadCategories()
         
+        
         //查詢Realm File路徑
         //print(Realm.Configuration.defaultConfiguration.fileURL)
         
@@ -29,10 +32,18 @@ class CategoryViewController: UITableViewController {
     //MARK: TableView DataSource Methods
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
+        //從super class繼承過來的cell (已經是Swipe cell了)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
-        cell.textLabel?.text = categories?[indexPath.row].name ?? "No Categories Add yet."
+        let category = categories?[indexPath.row]
+        cell.textLabel?.text = category?.name ?? "No Categories Add yet."
         
+        //最後的""代表預設值，這邊用"66CCFF"為水藍色
+        guard let categoryColour = UIColor(hexString: category?.colour ?? "66CCFF") else{fatalError()}
+        
+        cell.backgroundColor = categoryColour
+        cell.textLabel?.textColor = UIColor(contrastingBlackOrWhiteColorOn: categoryColour, isFlat: true)
+
         return cell
     }
 
@@ -54,21 +65,7 @@ class CategoryViewController: UITableViewController {
             destinationVC.selectedCategory = categories?[indexPath.row]
         }
     }
-    
-    //MARK: TableView Delete Methods
-    //尚未解決：刪除Category，item還保留的bug
-//    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
-//
-//        if editingStyle == .delete {
-//
-//            context.delete(categoryArray[indexPath.row])
-//            categoryArray.remove(at: indexPath.row)
-//
-//            //context.delete(itemArray[indexPath.row])
-//
-//            saveCategory()
-//        }
-//    }
+
     
     //MARK: Add New Items
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -82,6 +79,8 @@ class CategoryViewController: UITableViewController {
             let newCategory = Category()
             newCategory.name = textField.text!
             
+            //在新增Category時亂數取得顏色16進位代碼的字串，存到.colour
+            newCategory.colour = UIColor.randomFlat.hexValue()
             
             self.save(category: newCategory)
             
@@ -98,14 +97,16 @@ class CategoryViewController: UITableViewController {
         alert.addAction(actionCancel)
         
         present(alert, animated: true)
+        
     }
 
-    
+    //MARK: - Data Manipulation Methods
     func save(category: Category) {
         
         do{
             try realm.write {
                 realm.add(category)
+                
             }
         }catch{
             print("Error Saving context, \(error)")
@@ -118,8 +119,23 @@ class CategoryViewController: UITableViewController {
         //這代表從realm裡面屬於Category的所有項目
         categories = realm.objects(Category.self)
         
-
         tableView.reloadData()
     }
     
+    //MARK: - Delete Data From Swipe
+    override func updateModel(at indexPath: IndexPath) {
+     
+        //super.updateModel(at: indexPath)，如果要保留執行super class方法裡的內容，就加入開頭這行，代表先執行super class這個方法的內容，再複寫加入新功能，不加就是全新的功能。
+        
+        if let categoryForDeletion = self.categories?[indexPath.row] {
+            do {
+                try self.realm.write {
+                    self.realm.delete(categoryForDeletion)
+                }
+            }catch{
+                print("Error Delete Category, \(error)")
+            }
+        }
+    }
 }
+

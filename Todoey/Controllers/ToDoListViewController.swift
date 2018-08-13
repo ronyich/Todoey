@@ -8,12 +8,15 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class ToDoListViewController: UITableViewController {
+class ToDoListViewController: SwipeTableViewController {
     
     var todoItems:Results<Item>?
     
     let realm = try! Realm()
+    
+    @IBOutlet weak var searchBar: UISearchBar!
     
     //使用者點選的索引值，是從CategoryVC丟過來的，並用didSet直接load現有資料。
     var selectedCategory: Category? {
@@ -24,22 +27,85 @@ class ToDoListViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
     }
     
-    //MARK: TableView DataSource Methods
+    //當畫面即將載入，先讓navBar顯示顏色，如果放在viewDidLoad()會因為navBar還沒生成而crash.
+    override func viewWillAppear(_ animated: Bool) {
+        
+        //把選到的Category存到目前VC的title
+        title = selectedCategory?.name
+        
+        
+        guard let colourHex = selectedCategory?.colour else {
+            fatalError("colourHex does not exist.")
+        }
+        
+        updateNavBar(withHexCode: colourHex)
+
+        
+    }
+    
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        //因為這個VC消失時，會把目前barTintColor的顏色帶回上一個VC，
+        //這邊用意在讓目前VC消失時，barTintColor變回指定的"1D9BF6"顏色，還有其他項目顏色的調整
+        //guard let originalColour = UIColor(hexString: "1D9BF6") else {fatalError()}
+        
+        updateNavBar(withHexCode: "1D9BF6")
+    }
+    
+    //MARK: - Nav Bar Setup Methods
+    func updateNavBar(withHexCode colourHexCode:String) {
+        
+        guard let navBar = navigationController?.navigationBar else {
+            fatalError("Navigation controller does not exist.")
+        }
+        guard let navBarColour = UIColor(hexString: colourHexCode) else {
+            fatalError("navBarColour does not exist.")
+        }
+        //導覽列顏色
+        navBar.barTintColor = navBarColour
+        
+        //讓導覽列上的按鈕們變成navBarColour的對比色，像返回按鈕遇到深色背景，就會從原本藍變白色
+        navBar.tintColor = ContrastColorOf(navBarColour, returnFlat: true)
+        
+        //把大標題文字的顏色，也設定成目前顏色navBarColour的對比色
+        navBar.largeTitleTextAttributes = [NSAttributedStringKey.foregroundColor: ContrastColorOf(navBarColour, returnFlat: true)]
+        
+        searchBar.barTintColor = navBarColour
+        
+    }
+    
+    //MARK: - TableView DataSource Methods
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+        
+        //cell.textLabel?.text = todoItems?[indexPath.row].title ?? "No Items Added."
+        //cell.accessoryType = (todoItems?[indexPath.row].done)! ? .checkmark : .none
         
         if let item = todoItems?[indexPath.row] {
-            
+
             cell.textLabel?.text = item.title
             
+            
+            //將cell背景顏色設定成漸暗的漸層，百分比設定為(該cell / cell總數)
+            //若cell總數為:10，第1個cell的顏色會是FlatSkyBlue()的10%，第2個為20%...以此類推
+            //注意:要用CGFloat(a) / CGFloat(b)才會正確，因為這樣是Float除以Float
+            //如果用CGFloat(a/b)的結果會是Int除以Int，結果會四捨五入(假設結果是0.33，就會變0)
+            if let colour = UIColor(hexString: selectedCategory!.colour)?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(todoItems!.count)) {
+                cell.backgroundColor = colour
+                
+                //讓字體依照顏色亮度，自動調成適合辨識的白色或黑色
+                cell.textLabel?.textColor = UIColor(contrastingBlackOrWhiteColorOn: colour, isFlat: true)
+            }
+
             //判斷若item.done為true就做checkmark打勾記號，false的話就做空白記號
             //Ternary operator 三元運算子
             //Value = condition ? valueIfTrue : valueIfFalse
             cell.accessoryType = item.done ? .checkmark : .none
-            
+
         }else{
             cell.textLabel?.text = "No Items Added."
         }
@@ -69,26 +135,6 @@ class ToDoListViewController: UITableViewController {
         
         tableView.reloadData()
     }
-    
-    //MARK: TableView Delete Methods
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
-
-        if editingStyle == .delete {
-            
-            if let item = todoItems?[indexPath.row] {
-                do{
-                    try realm.write {
-                        realm.delete(item)
-                    
-                    }
-                }catch{
-                    print("Error delete item, \(error)")
-                }
-            }
-            tableView.reloadData()
-        }
-    }
-    
     
     //MARK: Add New Items
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -134,22 +180,29 @@ class ToDoListViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
         
     }
-    
-    func save(item:Item? = nil) {
-       
-        
-    }
+
     
     //用fetchRequest() 請求取回資料 (從context中取回)，把取回的資料存到todoItems中
     //在方法中給參數明確的值，可以在呼叫時不加外部參數，如保持loadItem()，但其實裡面已經包含request的值
     func loadItems() {
         //從關聯的Category.items拿到所有title資料並排序，
         todoItems = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: true)
-        
 
         tableView.reloadData()
     }
-
+    
+    override func updateModel(at indexPath: IndexPath) {
+        
+        if let itemForDeletion = self.todoItems?[indexPath.row] {
+            do{
+                try self.realm.write {
+                    self.realm.delete(itemForDeletion)
+                }
+            }catch{
+                print("Error Delete Item,\(error)")
+            }
+        }
+    }
     
 }
 
